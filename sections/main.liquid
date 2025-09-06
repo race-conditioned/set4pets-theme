@@ -1,0 +1,43 @@
+<div class="main">
+  <section class="hero">
+    {% render 'hero-video' %}
+  </section>
+
+  <section class="product">
+    {% render 'intro-cta' %}
+  </section>
+
+  <div class="image-wrapper raised">
+    <img src="{{ 's4p1.png' | asset_url }}" alt="set 4 pets product with dog" class="product-image1">
+  </div>
+
+  <section class="appeal-cta raised">
+    {% render 'icon-appeal-cta' %}
+  </section>
+</div>
+
+{% schema %}
+{
+  "name": "Main Section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "product_heading",
+      "label": "Product Heading",
+      "default": "Premium Backpack Carrier"
+    },
+    {
+      "type": "text",
+      "id": "product_subheading",
+      "label": "Product Subheading",
+      "default": "Safety, Comfort, Quality"
+    },
+    {
+      "type": "image_picker",
+      "id": "s4p1",
+      "label": "Sets 4 Pets 1"
+    }
+  ]
+}
+{% endschema %}
+

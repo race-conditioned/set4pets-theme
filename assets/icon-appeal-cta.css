@@ -1,0 +1,11 @@
+.icon-appeal-cta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.icon-wrapper {
+  width: 90px;
+}
