@@ -3,9 +3,43 @@
   justify-content: center;
   align-items: center;
   flex-direction: column;
-  gap: 30px;
+  gap: 50px;
+}
+
+.small-icon-text {
+  font-size: 16px;
+  max-width: 200px;
 }
 
 .icon-wrapper {
-  width: 90px;
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-items: center;
+  text-align: center;
+
+  width: 200px;
+  height: 160px;
+}
+
+.icon-appeal-icon {
+  width: 100px;
+  height: 78px;
+}
+
+@media screen and (max-width: 697px) {
+  .icon-wrapper {
+    width: 100px;
+    height: 80px;
+  }
+
+  .icon-appeal-icon {
+    max-width: 50px;
+    max-height: 39px;
+  }
+
+  .small-icon-text {
+    font-size: 8px;
+    max-width: 100px;
+  }
 }
