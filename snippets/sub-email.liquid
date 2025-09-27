@@ -1,0 +1,15 @@
+<div class="email">
+  <input type="text" placeholder="Email" class="email-input"/>
+  <button class="button-3" id="subscribeBtn">Subscribe</button>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const button = document.getElementById("subscribeBtn");
+    const input  = document.querySelector(".email-input");
+
+    button.addEventListener("click", function() {
+      console.log("Button clicked!");
+    });
+  });
+</script>
