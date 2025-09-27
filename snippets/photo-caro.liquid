@@ -1,3 +1,211 @@
-<div class="hero-video">
-  <h1>Photo Carousel</h1>
+
+<div class="photos-section">
+  <h2 class="reviews-title">See it in the wild</h2>
+  <p class="reviews-subtitle">Customer photos & lifestyle shots</p>
+
+  <div class="photos-viewport">
+    <div class="photos-track" aria-live="polite"></div>
+  </div>
+
+  <div class="photos-nav">
+    <button class="photos-btn prev" type="button" aria-label="Previous photos">
+      <span class="icon">‹</span>
+    </button>
+    <button class="photos-btn next" type="button" aria-label="Next photos">
+      <span class="icon">›</span>
+    </button>
+  </div>
 </div>
+
+<style>
+  .photos-section {
+    padding: 40px 16px 56px;
+    background: #e9eae6;
+    text-align: center;
+    --accent: #c8eb1b;
+  }
+
+  .reviews-title {
+    font-size: clamp(28px, 4vw, 48px);
+    line-height: 1.1;
+    margin: 0 0 8px;
+    color: #3b3b3b;
+    font-weight: 700;
+  }
+  .reviews-subtitle {
+    margin: 0 0 28px;
+    color: #5b5b5b;
+    font-size: 16px;
+  }
+
+  .photos-viewport {
+    max-width: 1120px;
+    margin: 0 auto 18px;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+  .photos-track {
+    display: flex;
+    align-items: stretch;
+    gap: var(--gap, 20px);
+    will-change: transform;
+    transform: translateX(0);
+  }
+
+  .photo-card {
+    flex: 0 0 auto; /* width set via JS */
+    box-sizing: border-box;
+    background: #fff;
+    border: 2px solid #bfc6b7;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .photo-media {
+    width: 100%;
+    aspect-ratio: 4 / 3;   /* change to 1 / 1 for square */
+    background: #f5f6f2;
+    position: relative;
+  }
+  .photo-media img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* nav buttons just for photos */
+  .photos-nav { display:flex; gap:12px; justify-content:center; margin-top:12px; }
+  .photos-btn{
+    width:36px; height:36px; border-radius:999px; border:none;
+    background:var(--accent); color:#232323;
+    display:flex; align-items:center; justify-content:center;
+    padding:0; line-height:1; font-size:18px; font-weight:600;
+    -webkit-appearance:none; appearance:none; cursor:pointer;
+  }
+  .photos-btn .icon{ display:inline-block; line-height:1; transform: translateY(-1px); }
+  .photos-btn:focus-visible { outline:3px solid #222; outline-offset:2px; }
+</style>
+
+<script>
+(function initPhotosCarousel() {
+  const section  = document.querySelector('.photos-section');
+  if (!section) return;
+
+  const viewport = section.querySelector('.photos-viewport');
+  const track    = section.querySelector('.photos-track');
+  const prevBtn  = section.querySelector('.photos-btn.prev');
+  const nextBtn  = section.querySelector('.photos-btn.next');
+
+  if (!viewport || !track) return;
+
+  /* CONFIG */
+  const speed = 400;   // ms
+  const gap   = 20;    // px
+  track.style.setProperty('--gap', `${gap}px`);
+
+  /* STATE */
+  let slides  = [];
+  let perView = 1;     // 1 mobile, 3 desktop
+  let cardW   = 0;
+  let index   = 0;     // includes clones
+  let clonesL = 0, clonesR = 0;
+
+  const atDesktop   = () => window.innerWidth >= 992;
+  const calcPerView = () => (atDesktop() ? 3 : 1);
+
+  function makeCard(src, alt = 'Gallery photo') {
+    const card = document.createElement('div');
+    card.className = 'photo-card';
+    const wrap = document.createElement('div');
+    wrap.className = 'photo-media';
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.alt = alt;
+    img.src = src;
+    wrap.appendChild(img);
+    card.appendChild(wrap);
+    return card;
+  }
+
+  function setTransition(on){ track.style.transition = on ? `transform ${speed}ms ease` : 'none'; }
+  function cardWidth(){
+    const vw = viewport.clientWidth;
+    return Math.floor((vw - gap * (perView - 1)) / perView);
+  }
+  const xFor = i => -(i * (cardW + gap));
+  function applyTransform(){ track.style.transform = `translateX(${xFor(index)}px)`; }
+
+  function rebuild(data){
+    track.innerHTML = '';
+    slides = data.map(src => makeCard(src));
+
+    clonesL = clonesR = perView;
+
+    // left clones (last N)
+    for (let i = slides.length - clonesL; i < slides.length; i++) {
+      track.appendChild(slides[i].cloneNode(true));
+    }
+    // real slides
+    slides.forEach(s => track.appendChild(s));
+    // right clones (first N)
+    for (let i = 0; i < clonesR; i++) {
+      track.appendChild(slides[i].cloneNode(true));
+    }
+
+    cardW = cardWidth();
+    Array.from(track.children).forEach(el => el.style.width = cardW + 'px');
+
+    index = clonesL;
+    setTransition(false);
+    applyTransform();
+  }
+
+  function go(delta){ setTransition(true); index += delta; applyTransform(); }
+  function onTransitionEnd(){
+    const realCount = slides.length;
+    const firstReal = clonesL;
+    const lastReal  = clonesL + realCount - 1;
+    if (index < firstReal){ setTransition(false); index += realCount; applyTransform(); }
+    else if (index > lastReal){ setTransition(false); index -= realCount; applyTransform(); }
+  }
+
+  function mount(data){
+    perView = calcPerView();
+    rebuild(data);
+
+    track.addEventListener('transitionend', onTransitionEnd);
+    prevBtn && prevBtn.addEventListener('click', () => go(-1));
+    nextBtn && nextBtn.addEventListener('click', () => go(1));
+
+    let lastPV = perView;
+    window.addEventListener('resize', () => {
+      const nextPV = calcPerView();
+      if (nextPV !== lastPV) {
+        perView = nextPV; rebuild(data); lastPV = nextPV;
+      } else {
+        cardW = cardWidth();
+        Array.from(track.children).forEach(el => el.style.width = cardW + 'px');
+        setTransition(false); applyTransform();
+      }
+    });
+  }
+
+  // Ensure layout is ready before measuring widths
+  const photos = [
+    {{ 's4p1.png' | asset_url | json }},
+    {{ 's4p2.png' | asset_url | json }},
+    {{ 's4p3.png' | asset_url | json }},
+    {{ 's4p1.png' | asset_url | json }},
+    {{ 's4p2.png' | asset_url | json }},
+    {{ 's4p3.png' | asset_url | json }}
+  ];
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(() => mount(photos)));
+  } else {
+    requestAnimationFrame(() => mount(photos));
+  }
+})();
+</script>
+

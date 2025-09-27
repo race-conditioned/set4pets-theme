@@ -1,3 +1,272 @@
-<div class="hero-video">
-  <h1>Video Carousel</h1>
+
+<div class="video-section">
+  <h2 class="reviews-title">Video Carousel</h2>
+  <p class="reviews-subtitle">Quick looks & lifestyle clips</p>
+
+  <div class="video-viewport">
+    <div class="video-track" aria-live="polite"></div>
+  </div>
+
+  <div class="video-nav">
+    <button class="video-btn prev" type="button" aria-label="Previous videos">
+      <span class="icon">‹</span>
+    </button>
+    <button class="video-btn next" type="button" aria-label="Next videos">
+      <span class="icon">›</span>
+    </button>
+  </div>
 </div>
+
+<style>
+  .video-section {
+    padding: 40px 16px 56px;
+    background: #e9eae6;
+    text-align: center;
+    --accent: #c8eb1b; /* matches your primary */
+  }
+
+  /* reuse your heading styles */
+  .reviews-title {
+    font-size: clamp(28px, 4vw, 48px);
+    line-height: 1.1;
+    margin: 0 0 8px;
+    color: #3b3b3b;
+    font-weight: 700;
+  }
+  .reviews-subtitle {
+    margin: 0 0 28px;
+    color: #5b5b5b;
+    font-size: 16px;
+  }
+
+  .video-viewport {
+    max-width: 1120px;
+    margin: 0 auto 18px;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+  .video-track {
+    display: flex;
+    align-items: stretch;
+    gap: var(--gap, 20px);
+    will-change: transform;
+    transform: translateX(0);
+  }
+
+  .video-card {
+    flex: 0 0 auto; /* width set via JS */
+    box-sizing: border-box;
+    background: #fff;
+    border: 2px solid #bfc6b7;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .video-frame {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #f5f6f2;
+    position: relative;
+  }
+  .video-frame video {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+    border: 0;
+  }
+
+  .video-nav { display:flex; gap:12px; justify-content:center; margin-top:12px; }
+  .video-btn{
+    width:36px; height:36px; border-radius:999px; border:none;
+    background:var(--accent); color:#232323;
+    display:flex; align-items:center; justify-content:center;
+    padding:0; line-height:1; font-size:18px; font-weight:600;
+    -webkit-appearance:none; appearance:none; cursor:pointer;
+  }
+  .video-btn .icon{ display:inline-block; line-height:1; transform: translateY(-1px); }
+  .video-btn:focus-visible { outline:3px solid #222; outline-offset:2px; }
+</style>
+
+<script>
+(function initVideoCarousel() {
+  const section  = document.querySelector('.video-section');
+  if (!section) return;
+
+  const viewport = section.querySelector('.video-viewport');
+  const track    = section.querySelector('.video-track');
+  const prevBtn  = section.querySelector('.video-btn.prev');
+  const nextBtn  = section.querySelector('.video-btn.next');
+
+  if (!viewport || !track) return;
+
+  /* CONFIG */
+  const speed = 400;   // ms
+  const gap   = 20;    // px
+  track.style.setProperty('--gap', `${gap}px`);
+
+  /* STATE */
+  let slides  = [];    // REAL slides (DOM nodes)
+  let perView = 1;     // 1 mobile, 3 desktop
+  let cardW   = 0;
+  let index   = 0;     // includes clones
+  let clonesL = 0, clonesR = 0;
+
+  const atDesktop   = () => window.innerWidth >= 992;
+  const calcPerView = () => (atDesktop() ? 3 : 1);
+
+  // Create a card with a <video> inside
+  function makeCard({ src, poster = '', title = 'Video' }) {
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    const wrap = document.createElement('div');
+    wrap.className = 'video-frame';
+
+    const vid = document.createElement('video');
+    vid.src = src;              // HTTP request to free public video
+    vid.poster = poster || '';
+    vid.controls = true;
+    vid.muted = true;           // allow autoplay without user gesture
+    vid.playsInline = true;
+    vid.preload = 'metadata';
+
+    wrap.appendChild(vid);
+    card.appendChild(wrap);
+    return card;
+  }
+
+  function setTransition(on){ track.style.transition = on ? `transform ${speed}ms ease` : 'none'; }
+  function cardWidth(){
+    const vw = viewport.clientWidth;
+    return Math.floor((vw - gap * (perView - 1)) / perView);
+  }
+  const xFor = i => -(i * (cardW + gap));
+  function applyTransform(){ track.style.transform = `translateX(${xFor(index)}px)`; }
+
+  function rebuild(data){
+    track.innerHTML = '';
+    slides = data.map(makeCard);
+
+    clonesL = clonesR = perView;
+
+    // Left clones (last N)
+    for (let i = slides.length - clonesL; i < slides.length; i++) {
+      track.appendChild(slides[i].cloneNode(true));
+    }
+    // Real slides
+    slides.forEach(s => track.appendChild(s));
+    // Right clones (first N)
+    for (let i = 0; i < clonesR; i++) {
+      track.appendChild(slides[i].cloneNode(true));
+    }
+
+    cardW = cardWidth();
+    Array.from(track.children).forEach(el => el.style.width = cardW + 'px');
+
+    index = clonesL;
+    setTransition(false);
+    applyTransform();
+
+    // After building, update play/pause state
+    syncVideoPlayback();
+  }
+
+  function go(delta){ setTransition(true); index += delta; applyTransform(); }
+
+  function onTransitionEnd(){
+    const realCount = slides.length;
+    const firstReal = clonesL;
+    const lastReal  = clonesL + realCount - 1;
+
+    if (index < firstReal){ setTransition(false); index += realCount; applyTransform(); }
+    else if (index > lastReal){ setTransition(false); index -= realCount; applyTransform(); }
+
+    syncVideoPlayback();
+  }
+
+  function mount(data){
+    perView = calcPerView();
+    rebuild(data);
+
+    track.addEventListener('transitionend', onTransitionEnd);
+    prevBtn?.addEventListener('click', () => go(-1));
+    nextBtn?.addEventListener('click', () => go(1));
+
+    let lastPV = perView;
+    window.addEventListener('resize', () => {
+      const nextPV = calcPerView();
+      if (nextPV !== lastPV) {
+        perView = nextPV; rebuild(data); lastPV = nextPV;
+      } else {
+        cardW = cardWidth();
+        Array.from(track.children).forEach(el => el.style.width = cardW + 'px');
+        setTransition(false); applyTransform();
+        syncVideoPlayback();
+      }
+    });
+  }
+
+  /* Autoplay current page’s videos, pause the rest */
+  function syncVideoPlayback() {
+    const allVideos = track.querySelectorAll('video');
+    allVideos.forEach(v => { v.pause(); });
+
+    // Find the videos currently visible (within the page of perView)
+    const start = index;
+    for (let i = start; i < start + perView; i++) {
+      const slideEl = track.children[i];
+      if (!slideEl) continue;
+      const v = slideEl.querySelector('video');
+      if (v) {
+        // try playing; some browsers block if not muted
+        v.muted = true;
+        const p = v.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      }
+    }
+  }
+
+  // ---- PUBLIC FREE SAMPLE VIDEOS (HTTP) ----
+  // These are well-known public samples hosted by Google / open sources.
+  const videos = [
+    {
+      src: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      poster: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg',
+      title: 'Big Buck Bunny'
+    },
+    {
+      src: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+      poster: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg',
+      title: 'Elephants Dream'
+    },
+    {
+      src: 'https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+      poster: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/Sintel.jpg',
+      title: 'Sintel'
+    },
+    {
+      src: 'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+      poster: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/TearsOfSteel.jpg',
+      title: 'Tears of Steel'
+    },
+    {
+      src: 'https://storage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
+      poster: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/SubaruOutbackOnStreetAndDirt.jpg',
+      title: 'Outback Street & Dirt'
+    },
+    {
+      src: 'https://storage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4',
+      poster: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/VolkswagenGTIReview.jpg',
+      title: 'GTI Review'
+    }
+  ];
+
+  // Ensure layout is ready before measuring widths
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(() => mount(videos)));
+  } else {
+    requestAnimationFrame(() => mount(videos));
+  }
+})();
+</script>
+

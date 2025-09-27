@@ -1,3 +1,126 @@
-<div class="hero-video">
-  <h1>Video Loop</h1>
+
+<div class="hero-video hero-video--full" id="heroVideo">
+  <div class="hero-video-frame">
+    <video
+      class="hero-video-el"
+      autoplay
+      muted
+      loop
+      playsinline
+      preload="auto"
+      aria-label="Hero background video"
+    ></video>
+  </div>
 </div>
+
+<style>
+  /* Ensure the section itself can size */
+  .main > section.hero {
+    display: block;          /* avoid weird flex/grid child collapse */
+    width: 100%;
+    min-width: 0;            /* allow shrink inside flex parents */
+    padding: 0;              /* some themes add section padding */
+  }
+
+  /* Full-bleed without overshoot or 100vw scrollbar bug */
+  .hero-video--full{
+    position: relative;
+    width: 100%;
+    /* pull out to viewport edges relative to the container width */
+    margin-left:  calc(-1 * (100vw - 100%) / 2);
+    margin-right: calc(-1 * (100vw - 100%) / 2);
+    overflow-x: clip;
+    background: #000;
+    /* if parent is flex, make sure we actually take space */
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  @supports (width: 100svw) {
+    .hero-video--full{
+      margin-left:  calc(-1 * (100svw - 100%) / 2);
+      margin-right: calc(-1 * (100svw - 100%) / 2);
+    }
+  }
+
+  /* Definitive height: never 0, targets 16:9, capped by viewport */
+  .hero-video--full .hero-video-frame{
+    position: relative;
+    width: 100%;
+    height: clamp(240px, 56.25vw, 85vh);
+    min-height: 240px;   /* hard floor so it never vanishes */
+    overflow: hidden;
+    background: #000;
+  }
+
+  @supports (height: 100svh) {
+    .hero-video--full .hero-video-frame{
+      height: clamp(240px, 56.25svw, 85svh);
+    }
+  }
+
+  /* Fill the frame no matter what other global video rules exist */
+  .hero-video-el{
+    position: absolute; inset: 0;
+    width: 100%;
+    height: 100% !important;
+    object-fit: cover;
+    display: block !important;
+  }
+
+  /* Safety: if the page wrapper has horizontal padding, prevent page scroll */
+  .main { overflow-x: hidden; }
+</style>
+
+<script>
+(() => {
+  const root = document.getElementById('heroVideo');
+  const vid  = root?.querySelector('.hero-video-el');
+  if (!root || !vid) return;
+
+  // Measure real viewport (excludes scrollbar / browser UI)
+  function setViewportVars(){
+    const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    root.style.setProperty('--vw', vw + 'px');
+    root.style.setProperty('--vh', vh + 'px');
+  }
+
+  // Set now and on resize/orientation changes
+  setViewportVars();
+  window.addEventListener('resize', setViewportVars);
+  window.addEventListener('orientationchange', setViewportVars);
+
+  // Free, public sample videos
+  const sources = [
+    'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    'https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+  ];
+  let i = 0;
+
+  function setSrcAndPlay(url){
+    vid.src = url;
+    const play = () => {
+      const p = vid.play();
+      if (p && p.catch) p.catch(() => {});
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(play), { once:true });
+    } else {
+      requestAnimationFrame(play);
+    }
+  }
+
+  vid.addEventListener('error', () => {
+    if (i < sources.length - 1) { i += 1; setSrcAndPlay(sources[i]); }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && vid.paused) vid.play().catch(()=>{});
+  });
+
+  setSrcAndPlay(sources[i]);
+})();
+</script>
+

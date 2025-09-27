@@ -1,3 +1,330 @@
-<div class="hero-video">
-  <h1>reviews</h1>
+
+<div class="reviews-section">
+  <h2 class="reviews-title">What our customers say</h2>
+  <p class="reviews-subtitle">Read reviews from our happy customers</p>
+
+  <!-- viewport -->
+  <div class="reviews-viewport">
+    <!-- moving track; we’ll populate with cards via JS -->
+    <div class="reviews-track" aria-live="polite"></div>
+  </div>
+
+  
+  <div class="review-nav">
+    <button class="review-btn prev" type="button" aria-label="Previous review"><span class="icon">‹</span></button>
+    <button class="review-btn next" type="button" aria-label="Next review"><span class="icon">›</span></button>
+  </div>
 </div>
+
+<style>
+  .reviews-section {
+    padding: 40px 16px 56px;
+    background: #e9eae6;
+    text-align: center;
+    --accent: #c8eb1b; /* neon-lime */
+  }
+  .reviews-title {
+    font-size: clamp(28px, 4vw, 48px);
+    line-height: 1.1;
+    margin: 0 0 8px;
+    color: #3b3b3b;
+    font-weight: 700;
+  }
+  .reviews-subtitle {
+    margin: 0 0 28px;
+    color: #5b5b5b;
+    font-size: 16px;
+  }
+
+  /* viewport + track */
+  .reviews-viewport {
+    /* allow room for 3 cards + gaps on desktop */
+    max-width: 1120px;
+    margin: 0 auto 18px;
+    overflow: hidden;
+    border-radius: 16px;
+  }
+  .reviews-track {
+    display: flex;
+    align-items: stretch;
+    gap: var(--gap, 20px); /* must match the JS "gap" value */
+    will-change: transform;
+    transform: translateX(0);
+  }
+
+  /* card */
+  .review-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px 0px;
+    justify-content: space-between;
+    flex: 0 0 auto;               /* width set via JS for precise layout */
+    box-sizing: border-box;
+    padding: 28px 28px 24px;
+    background: #fff;
+    border: 2px solid #bfc6b7;
+    border-radius: 16px;
+    text-align: left;
+  }
+
+  .review-stars { display:inline-flex; gap:6px; margin-bottom:18px; font-size:0; }
+  .review-star {
+    width:22px;height:22px;display:inline-block;background:var(--accent);
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E") center/contain no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E") center/contain no-repeat;
+  }
+  .review-star.empty { background:#d4d8ce; }
+  .review-star.half { position:relative; background:#d4d8ce; }
+  .review-star.half::before { content:""; position:absolute; inset:0; width:50%; background:var(--accent); }
+
+  .review-text { font-size:18px; line-height:1.6; color:#333;  }
+  .review-user { display:flex; align-items:center; gap:10px; }
+  .review-avatar { width:26px; height:26px; border-radius:50%; background:var(--accent); flex:0 0 26px; }
+  .review-name { color:#3b3b3b; font-weight:500; }
+  .review-source { color:#7e7e7e; margin-left:6px; font-size:14px; }
+
+  
+  .review-nav { display:flex; gap:12px; justify-content:center; margin-top:12px; }
+
+  .review-btn{
+    width:36px; height:36px; border-radius:999px; border:none;
+    background:var(--accent); color:#232323;
+    display:flex; align-items:center; justify-content:center; /* true centering */
+    padding:0; line-height:1; font-size:18px; font-weight:600;
+    -webkit-appearance:none; appearance:none;  /* remove native weirdness */
+    cursor:pointer;
+  }
+  .review-btn .icon{
+    display:inline-block; line-height:1;
+    transform: translateY(-1px); /* tiny optical nudge; tweak -1/0/1px if needed */
+  }
+  .review-btn:focus-visible { outline:3px solid #222; outline-offset:2px; }
+  @media (max-width: 640px) {
+    .review-card { padding:22px; }
+    .review-text { font-size:16px; }
+  }
+</style>
+
+
+<script>
+(function() {
+  const viewport = document.querySelector('.reviews-viewport');
+  const track    = document.querySelector('.reviews-track');
+  const prevBtn  = document.querySelector('.review-btn.prev');
+  const nextBtn  = document.querySelector('.review-btn.next');
+
+  if (!viewport || !track) {
+    console.warn('[reviews] Missing required DOM nodes');
+    return;
+  }
+
+  /* CONFIG */
+  const speed = 400;    // transition ms
+  const gap   = 20;     // px; keep in sync with CSS --gap
+  track.style.setProperty('--gap', `${gap}px`);
+
+  /* STATE */
+  let slides  = [];     // REAL slides only (no clones)
+  let perView = 1;      // 1 on mobile, 3 on desktop
+  let cardW   = 0;      // single card width (px)
+  let index   = 0;      // current position within track (including clones)
+  let clonesL = 0, clonesR = 0;
+
+  /* Helpers */
+  const atDesktop   = () => window.innerWidth >= 992;
+  const calcPerView = () => (atDesktop() ? 3 : 1);
+
+  function starNodes(rating) {
+    const wrap = document.createElement('div');
+    wrap.className = 'review-stars';
+    const full = Math.floor(rating);
+    const half = rating % 1 >= 0.25 && rating % 1 < 0.75;
+    for (let s = 0; s < 5; s++) {
+      const span = document.createElement('span');
+      span.className = 'review-star' + (s < full ? '' : s === full && half ? ' half' : ' empty');
+      wrap.appendChild(span);
+    }
+    return wrap;
+  }
+
+  function makeCard(r) {
+    const card = document.createElement('div');
+    card.className = 'review-card';
+
+    card.appendChild(starNodes(Number(r.rating) || 0));
+
+    const p = document.createElement('p');
+    p.className = 'review-text';
+    p.textContent = r.text || '';
+    card.appendChild(p);
+
+    const user = document.createElement('div');
+    user.className = 'review-user';
+    user.innerHTML = `
+      <span class="review-avatar" aria-hidden="true"></span>
+      <span class="review-name">${r.user || 'Anonymous'}</span>
+      <span class="review-source">${r.source ? '• ' + r.source : ''}</span>
+    `;
+    card.appendChild(user);
+    return card;
+  }
+
+  function setTransition(on) {
+    track.style.transition = on ? `transform ${speed}ms ease` : 'none';
+  }
+
+  function cardWidth() {
+    const vw = viewport.clientWidth;
+    return Math.floor((vw - gap * (perView - 1)) / perView);
+  }
+
+  function xFor(i) {
+    return -(i * (cardW + gap));
+  }
+
+  function applyTransform() {
+    track.style.transform = `translateX(${xFor(index)}px)`;
+  }
+
+  function rebuild(data) {
+    // wipe
+    track.innerHTML = '';
+
+    // build real slides
+    slides = data.map(makeCard);
+
+    // clone counts: one full "page" worth on each side
+    clonesL = clonesR = perView;
+
+    // left clones (last N)
+    for (let i = slides.length - clonesL; i < slides.length; i++) {
+      track.appendChild(slides[i].cloneNode(true));
+    }
+    // real slides
+    slides.forEach(s => track.appendChild(s));
+    // right clones (first N)
+    for (let i = 0; i < clonesR; i++) {
+      track.appendChild(slides[i].cloneNode(true));
+    }
+
+    // size cards exactly so that perView fit the viewport
+    cardW = cardWidth();
+    Array.from(track.children).forEach(el => { el.style.width = cardW + 'px'; });
+
+    // start on first real slide
+    index = clonesL;
+    setTransition(false);
+    applyTransform();
+  }
+
+  function go(delta) {
+    setTransition(true);
+    index += delta;
+    applyTransform();
+  }
+
+  function onTransitionEnd() {
+    const realCount = slides.length;
+    const firstReal = clonesL;
+    const lastReal  = clonesL + realCount - 1;
+
+    if (index < firstReal) {
+      // jumped into left clones -> wrap to end
+      setTransition(false);
+      index += realCount;
+      applyTransform();
+    } else if (index > lastReal) {
+      // jumped into right clones -> wrap to start
+      setTransition(false);
+      index -= realCount;
+      applyTransform();
+    }
+  }
+
+  function mount(data) {
+    console.log("mounting reviews:", data)
+    perView = calcPerView();
+    rebuild(data);
+
+    // controls
+    track.addEventListener('transitionend', onTransitionEnd);
+    if (prevBtn) prevBtn.addEventListener('click', () => go(-1));  // slide 1 card
+    if (nextBtn) nextBtn.addEventListener('click', () => go(1));
+
+    // update on resize
+    let lastPerView = perView;
+    window.addEventListener('resize', () => {
+      const nextPerView = calcPerView();
+      if (nextPerView !== lastPerView) {
+        perView = nextPerView;
+        rebuild(data);            // rebuild clones and widths for new layout
+        lastPerView = nextPerView;
+      } else {
+        // same layout: just recalc widths
+        cardW = cardWidth();
+        Array.from(track.children).forEach(el => { el.style.width = cardW + 'px'; });
+        setTransition(false);
+        applyTransform();
+      }
+    });
+
+    // OPTIONAL autoplay:
+    // let timer = setInterval(() => go(1), 4000);
+    // [prevBtn, nextBtn, viewport].forEach(el => {
+    //   el.addEventListener('mouseenter', () => clearInterval(timer));
+    //   el.addEventListener('mouseleave', () => timer = setInterval(() => go(1), 4000));
+    // });
+  }
+
+  // ---- Fetch reviews.json from /assets via Liquid-safe URL ----
+  const REVIEWS_URL = {{ 'reviews.json' | asset_url | json }}; // JS string safely emitted by Liquid
+  console.log('[reviews] asset url:', REVIEWS_URL);
+
+  fetch(REVIEWS_URL, { cache: 'no-store' })
+    .then(async (res) => {
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status} ${res.statusText} – ${txt.slice(0, 120)}…`);
+      }
+      // Some shops serve JSON with text/plain; still fine to parse
+      return res.text();
+    })
+    .then((txt) => {
+      console.log("parsing json:", txt)
+      try {
+        return JSON.parse(txt);
+      } catch (e) {
+        throw new Error('Invalid JSON in /assets/reviews.json: ' + e.message);
+      }
+    })
+    .then((arr) => {
+      if (!Array.isArray(arr) || !arr.length) throw new Error('Empty or non-array data');
+      mount(arr);
+    })
+    .catch((err) => {
+      console.error('[reviews] Failed to load reviews.json, using fallback:', err);
+      // Fallback data so the UI still works
+      mount([
+        {
+          "rating": 4.5,
+          "text": "no",
+          "user": "AliceW",
+          "source": "Amazon"
+        },
+        {
+          "rating": 3.5,
+          "text": "no",
+          "user": "AliceW",
+          "source": "Amazon"
+        },
+        {
+          "rating": 4.8,
+          "text": "no",
+          "user": "Bob",
+          "source": "Amazon"
+        }
+      ]);
+    });
+})();
+</script>
+
